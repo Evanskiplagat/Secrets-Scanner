@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from scanner.core.baseline import write_baseline_file
 from scanner.core.models import Detection, Severity
 from scanner.reports.renderers import write_csv_report, write_html_report, write_json_report
 
@@ -41,3 +42,15 @@ def test_csv_and_html_reports_are_written(tmp_path: Path) -> None:
     assert "AWS Access Key" in csv_destination.read_text(encoding="utf-8")
     assert "Secret Scanner Report" in html_destination.read_text(encoding="utf-8")
 
+
+def test_baseline_file_uses_hashes_not_raw_values(tmp_path: Path) -> None:
+    detection = sample_detection(tmp_path)
+    destination = tmp_path / "baseline.json"
+
+    write_baseline_file(destination, [detection], tmp_path, scanned_files=1)
+    payload = json.loads(destination.read_text(encoding="utf-8"))
+
+    finding = payload["findings"][0]
+    assert finding["preview"] == "AKIA****9KLM"
+    assert "AKIA1234567890ABCD9KLM" not in destination.read_text(encoding="utf-8")
+    assert len(finding["secret_hash"]) == 64

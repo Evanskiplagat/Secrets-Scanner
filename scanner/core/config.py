@@ -36,4 +36,5 @@ class ScanConfig:
     min_severity: Severity = Severity.LOW
     max_workers: int | None = None
     log_level: str = "WARNING"
-
+    baseline_path: Path | None = None
+    ignore_file_path: Path | None = None

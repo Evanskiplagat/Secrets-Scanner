@@ -7,6 +7,11 @@ from pathlib import Path
 from rich.console import Console
 
 from scanner import __version__
+from scanner.core.baseline import (
+    filter_suppressed_detections,
+    load_suppressed_fingerprints,
+    write_baseline_file,
+)
 from scanner.core.config import DEFAULT_EXCLUSIONS, ScanConfig
 from scanner.core.models import Severity
 from scanner.core.scanner import scan_repository
@@ -48,6 +53,23 @@ def build_parser() -> argparse.ArgumentParser:
         const="secret-scan-report.html",
         metavar="PATH",
         help="Write an HTML report. Uses secret-scan-report.html when no path is supplied.",
+    )
+    scan_parser.add_argument(
+        "--baseline",
+        metavar="PATH",
+        help="Suppress findings present in a baseline JSON file.",
+    )
+    scan_parser.add_argument(
+        "--write-baseline",
+        nargs="?",
+        const="secret-scan-baseline.json",
+        metavar="PATH",
+        help="Write a baseline JSON file. Uses secret-scan-baseline.json when no path is supplied.",
+    )
+    scan_parser.add_argument(
+        "--ignore-file",
+        metavar="PATH",
+        help="Load newline-delimited finding fingerprints to suppress.",
     )
     scan_parser.add_argument(
         "--severity",
@@ -112,9 +134,13 @@ def main(argv: list[str] | None = None) -> int:
         min_severity=Severity.from_string(args.severity),
         max_workers=args.workers,
         log_level=args.log_level,
+        baseline_path=Path(args.baseline).resolve() if args.baseline else None,
+        ignore_file_path=Path(args.ignore_file).resolve() if args.ignore_file else None,
     )
 
     detections, scanned_files = scan_repository(config, console)
+    suppressed_fingerprints = load_suppressed_fingerprints(config.baseline_path, config.ignore_file_path)
+    detections = filter_suppressed_detections(detections, scan_root, suppressed_fingerprints)
     render_terminal(console, detections, scan_root, scanned_files)
 
     if args.json:
@@ -126,7 +152,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.html:
         write_html_report(Path(args.html), detections, scan_root, scanned_files)
         console.print(f"[cyan]HTML report written:[/cyan] {args.html}")
+    if args.write_baseline:
+        write_baseline_file(Path(args.write_baseline), detections, scan_root, scanned_files)
+        console.print(f"[cyan]Baseline file written:[/cyan] {args.write_baseline}")
 
     highest_severity = max((detection.severity for detection in detections), default=Severity.LOW)
     return 1 if highest_severity >= Severity.HIGH and detections else 0
-

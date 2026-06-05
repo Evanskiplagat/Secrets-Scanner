@@ -1,5 +1,7 @@
+import json
 from pathlib import Path
 
+from scanner.core.baseline import filter_suppressed_detections, load_suppressed_fingerprints
 from rich.console import Console
 
 from scanner.core.config import ScanConfig
@@ -36,3 +38,55 @@ def test_scan_repository_respects_exclusions(tmp_path: Path) -> None:
     assert scanned_files == 1
     assert findings
     assert all(finding.file_path.name == "main.py" for finding in findings)
+
+
+def test_baseline_suppresses_matching_findings(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "config.py").write_text('password = "VisiblePassword123"\n', encoding="utf-8")
+
+    config = ScanConfig(target_path=project)
+    findings, scanned_files = scan_repository(config, Console(file=None, width=120))
+    assert scanned_files == 1
+    assert findings
+
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "findings": [
+                    {"fingerprint": finding.fingerprint(project)}
+                    for finding in findings
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    suppressed = load_suppressed_fingerprints(baseline_path, None)
+    filtered = filter_suppressed_detections(findings, project, suppressed)
+
+    assert filtered == []
+
+
+def test_ignore_file_suppresses_matching_findings(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "config.py").write_text('password = "VisiblePassword123"\n', encoding="utf-8")
+
+    config = ScanConfig(target_path=project)
+    findings, _ = scan_repository(config, Console(file=None, width=120))
+    assert findings
+
+    ignore_path = tmp_path / ".secret-scanner-ignore"
+    ignore_path.write_text(
+        "# accepted findings\n"
+        + "\n".join(finding.fingerprint(project) for finding in findings)
+        + "\n",
+        encoding="utf-8",
+    )
+
+    suppressed = load_suppressed_fingerprints(None, ignore_path)
+    filtered = filter_suppressed_detections(findings, project, suppressed)
+
+    assert filtered == []

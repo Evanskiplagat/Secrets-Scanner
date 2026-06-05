@@ -10,6 +10,7 @@ Secret Scanner is a production-oriented Python CLI for detecting exposed credent
 - Risk classification with `Critical`, `High`, `Medium`, and `Low`
 - Rich terminal output with progress indicator and masked previews
 - JSON, CSV, and HTML report generation
+- Baseline generation and suppression for accepted findings
 - Directory exclusions with built-in defaults and custom additions
 - Multi-threaded scanning suitable for large repositories
 - Exit codes suitable for CI pipelines
@@ -63,6 +64,14 @@ python main.py scan ./project --csv findings.csv
 python main.py scan ./project --html findings.html
 ```
 
+Generate and reuse a baseline:
+
+```bash
+python main.py scan ./project --write-baseline
+python main.py scan ./project --baseline secret-scan-baseline.json
+python main.py scan ./project --ignore-file .secret-scanner-ignore
+```
+
 Filter by severity and add exclusions:
 
 ```bash
@@ -98,6 +107,7 @@ python main.py scan ./project --severity high --exclude vendor --exclude coverag
 - Full secret values are never printed to the terminal
 - Reports include only masked previews
 - Detection results omit raw secret material from persisted output
+- Baseline entries store a SHA-256 hash of the matched secret rather than the raw secret
 - File decoding uses safe UTF-8 fallback behavior
 
 ## CI and Container Support
@@ -132,4 +142,3 @@ python main.py scan tests --severity low
 ## License
 
 Use and adapt within your internal security tooling or delivery pipelines as needed.
-
