@@ -11,6 +11,7 @@ Secret Scanner is a production-oriented Python CLI for detecting exposed credent
 - Rich terminal output with progress indicator and masked previews
 - JSON, CSV, and HTML report generation
 - Baseline generation and suppression for accepted findings
+- Project-level config via `.secret-scanner.yml`, `.secret-scanner.yaml`, or `.secret-scanner.json`
 - Directory exclusions with built-in defaults and custom additions
 - Multi-threaded scanning suitable for large repositories
 - Exit codes suitable for CI pipelines
@@ -19,17 +20,17 @@ Secret Scanner is a production-oriented Python CLI for detecting exposed credent
 
 ```text
 secret-scanner/
-├── scanner/
-│   ├── detectors/
-│   ├── core/
-│   ├── reports/
-│   └── utils/
-├── tests/
-├── docs/
-├── main.py
-├── requirements.txt
-├── Dockerfile
-└── README.md
+|-- scanner/
+|   |-- detectors/
+|   |-- core/
+|   |-- reports/
+|   `-- utils/
+|-- tests/
+|-- docs/
+|-- main.py
+|-- requirements.txt
+|-- Dockerfile
+`-- README.md
 ```
 
 ## Installation
@@ -78,11 +79,32 @@ Filter by severity and add exclusions:
 python main.py scan ./project --severity high --exclude vendor --exclude coverage
 ```
 
+Use a project config file:
+
+```yaml
+severity: high
+workers: 8
+log_level: info
+baseline: .secrets/baseline.json
+ignore_file: .secret-scanner-ignore
+exclude:
+  - vendor
+  - coverage
+```
+
+When present in the scan root, `.secret-scanner.yml`, `.secret-scanner.yaml`, or `.secret-scanner.json` is loaded automatically. CLI flags override config file values.
+
+Load a specific config file:
+
+```bash
+python main.py scan ./project --config ./configs/security/.secret-scanner.yml
+```
+
 ## Exit Codes
 
 - `0`: No findings at `High` or above
 - `1`: At least one `High` or `Critical` finding detected
-- `2`: Invalid or missing target
+- `2`: Invalid or missing target, or invalid config file
 
 ## Supported Secret Types
 

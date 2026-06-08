@@ -12,7 +12,12 @@ from scanner.core.baseline import (
     load_suppressed_fingerprints,
     write_baseline_file,
 )
-from scanner.core.config import DEFAULT_EXCLUSIONS, ScanConfig
+from scanner.core.config import (
+    DEFAULT_EXCLUSIONS,
+    ScanConfig,
+    discover_config_path,
+    load_project_config,
+)
 from scanner.core.models import Severity
 from scanner.core.scanner import scan_repository
 from scanner.reports.renderers import (
@@ -33,6 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan_parser = subparsers.add_parser("scan", help="Scan a directory recursively.")
     scan_parser.add_argument("target", type=Path, help="Directory or file to scan.")
+    scan_parser.add_argument(
+        "--config",
+        metavar="PATH",
+        help="Load scan defaults from a project config file.",
+    )
     scan_parser.add_argument(
         "--json",
         nargs="?",
@@ -74,8 +84,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument(
         "--severity",
         choices=[severity.name.lower() for severity in Severity],
-        default="low",
-        help="Minimum severity to include in output.",
+        default=None,
+        help="Minimum severity to include in output. Defaults to low.",
     )
     scan_parser.add_argument(
         "--exclude",
@@ -93,8 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        default="WARNING",
-        help="Logging verbosity.",
+        default=None,
+        help="Logging verbosity. Defaults to WARNING.",
     )
     return parser
 
@@ -114,7 +124,6 @@ def _resolve_scan_root(target: Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    configure_logging(args.log_level)
     console = Console()
 
     if args.command != "scan":
@@ -125,17 +134,36 @@ def main(argv: list[str] | None = None) -> int:
         console.print(f"[red]Target not found:[/red] {target}")
         return 2
 
-    exclusions = set(DEFAULT_EXCLUSIONS)
-    exclusions.update(args.exclude)
     scan_root = _resolve_scan_root(target)
+    config_path = Path(args.config).resolve() if args.config else discover_config_path(scan_root)
+    try:
+        project_config = load_project_config(config_path) if config_path else None
+    except ValueError as exc:
+        console.print(f"[red]Invalid config file:[/red] {config_path}")
+        console.print(f"[red]{exc}[/red]")
+        return 2
+
+    log_level = args.log_level or (project_config.log_level if project_config and project_config.log_level else "WARNING")
+    configure_logging(log_level)
+
+    exclusions = set(DEFAULT_EXCLUSIONS)
+    if project_config:
+        exclusions.update(project_config.exclusions)
+    exclusions.update(args.exclude)
     config = ScanConfig(
         target_path=target,
         exclusions=exclusions,
-        min_severity=Severity.from_string(args.severity),
-        max_workers=args.workers,
-        log_level=args.log_level,
-        baseline_path=Path(args.baseline).resolve() if args.baseline else None,
-        ignore_file_path=Path(args.ignore_file).resolve() if args.ignore_file else None,
+        min_severity=Severity.from_string(args.severity)
+        if args.severity
+        else (project_config.min_severity if project_config and project_config.min_severity else Severity.LOW),
+        max_workers=args.workers if args.workers is not None else (project_config.max_workers if project_config else None),
+        log_level=log_level,
+        baseline_path=Path(args.baseline).resolve()
+        if args.baseline
+        else (project_config.baseline_path if project_config else None),
+        ignore_file_path=Path(args.ignore_file).resolve()
+        if args.ignore_file
+        else (project_config.ignore_file_path if project_config else None),
     )
 
     detections, scanned_files = scan_repository(config, console)
