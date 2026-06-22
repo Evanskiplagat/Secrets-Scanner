@@ -11,4 +11,5 @@ build/
 htmlcov/
 .coverage
 reports/
-
+!scanner/reports/
+!scanner/reports/*.py
