@@ -9,7 +9,7 @@ Secret Scanner is a production-oriented Python CLI for detecting exposed credent
 - Hardcoded credential detection and entropy-based heuristics for suspicious secrets
 - Risk classification with `Critical`, `High`, `Medium`, and `Low`
 - Rich terminal output with progress indicator and masked previews
-- JSON, CSV, and HTML report generation
+- JSON, CSV, HTML, and SARIF report generation
 - Baseline generation and suppression for accepted findings
 - Project-level config via `.secret-scanner.yml`, `.secret-scanner.yaml`, or `.secret-scanner.json`
 - Directory exclusions with built-in defaults and custom additions
@@ -63,6 +63,7 @@ Generate reports:
 python main.py scan ./project --json
 python main.py scan ./project --csv findings.csv
 python main.py scan ./project --html findings.html
+python main.py scan ./project --sarif findings.sarif
 ```
 
 Generate and reuse a baseline:

@@ -25,6 +25,7 @@ from scanner.reports.renderers import (
     write_csv_report,
     write_html_report,
     write_json_report,
+    write_sarif_report,
 )
 
 
@@ -63,6 +64,13 @@ def build_parser() -> argparse.ArgumentParser:
         const="secret-scan-report.html",
         metavar="PATH",
         help="Write an HTML report. Uses secret-scan-report.html when no path is supplied.",
+    )
+    scan_parser.add_argument(
+        "--sarif",
+        nargs="?",
+        const="secret-scan-report.sarif",
+        metavar="PATH",
+        help="Write a SARIF report. Uses secret-scan-report.sarif when no path is supplied.",
     )
     scan_parser.add_argument(
         "--baseline",
@@ -180,6 +188,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.html:
         write_html_report(Path(args.html), detections, scan_root, scanned_files)
         console.print(f"[cyan]HTML report written:[/cyan] {args.html}")
+    if args.sarif:
+        write_sarif_report(Path(args.sarif), detections, scan_root, scanned_files)
+        console.print(f"[cyan]SARIF report written:[/cyan] {args.sarif}")
     if args.write_baseline:
         write_baseline_file(Path(args.write_baseline), detections, scan_root, scanned_files)
         console.print(f"[cyan]Baseline file written:[/cyan] {args.write_baseline}")
