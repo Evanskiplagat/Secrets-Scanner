@@ -90,3 +90,29 @@ def test_ignore_file_suppresses_matching_findings(tmp_path: Path) -> None:
     filtered = filter_suppressed_detections(findings, project, suppressed)
 
     assert filtered == []
+
+
+def test_scan_repository_continues_when_a_file_scan_fails(tmp_path: Path, monkeypatch) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    broken_file = project / "broken.py"
+    valid_file = project / "valid.py"
+    broken_file.write_text('password = "BrokenPassword123"\n', encoding="utf-8")
+    valid_file.write_text('password = "VisiblePassword123"\n', encoding="utf-8")
+
+    from scanner.core import scanner as scanner_module
+
+    original_scan_file = scanner_module._scan_file
+
+    def flaky_scan(file_path: Path):
+        if file_path == broken_file:
+            raise RuntimeError("boom")
+        return original_scan_file(file_path)
+
+    monkeypatch.setattr(scanner_module, "_scan_file", flaky_scan)
+
+    findings, scanned_files = scan_repository(ScanConfig(target_path=project), Console(file=None, width=120))
+
+    assert scanned_files == 2
+    assert findings
+    assert all(finding.file_path == valid_file for finding in findings)

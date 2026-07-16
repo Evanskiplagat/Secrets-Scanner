@@ -48,6 +48,32 @@ def test_csv_and_html_reports_are_written(tmp_path: Path) -> None:
     assert "Secret Scanner Report" in html_destination.read_text(encoding="utf-8")
 
 
+def test_report_writers_create_parent_directories_and_escape_html(tmp_path: Path) -> None:
+    file_path = tmp_path / "nested" / "alert_script.py"
+    file_path.parent.mkdir()
+    file_path.write_text("placeholder", encoding="utf-8")
+    detection = Detection(
+        file_path=file_path,
+        line_number=7,
+        secret_type="Inline <Token>",
+        severity=Severity.HIGH,
+        preview='abc"<masked>&',
+        rule_id="inline_token",
+        matched_text='abc"<masked>&',
+    )
+    html_destination = tmp_path / "reports" / "nested" / "report.html"
+    json_destination = tmp_path / "reports" / "nested" / "report.json"
+
+    write_html_report(html_destination, [detection], tmp_path, scanned_files=1)
+    write_json_report(json_destination, [detection], tmp_path, scanned_files=1)
+
+    html_report = html_destination.read_text(encoding="utf-8")
+    assert "alert_script.py" in html_report
+    assert "Inline &lt;Token&gt;" in html_report
+    assert 'abc&quot;&lt;masked&gt;&amp;' in html_report
+    assert json_destination.exists()
+
+
 def test_baseline_file_uses_hashes_not_raw_values(tmp_path: Path) -> None:
     detection = sample_detection(tmp_path)
     destination = tmp_path / "baseline.json"

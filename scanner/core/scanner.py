@@ -43,11 +43,16 @@ def scan_repository(config: ScanConfig, console: Console) -> tuple[list[Detectio
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {executor.submit(_scan_file, file_path): file_path for file_path in candidate_files}
             for future in as_completed(future_map):
-                findings = future.result()
+                file_path = future_map[future]
+                try:
+                    findings = future.result()
+                except Exception as exc:  # pragma: no cover - defensive guard
+                    LOGGER.warning("Failed scanning %s: %s", file_path, exc)
+                    progress.advance(task_id)
+                    continue
                 filtered_findings.extend(
                     detection for detection in findings if detection.severity >= config.min_severity
                 )
                 progress.advance(task_id)
 
     return filtered_findings, len(candidate_files)
-

@@ -49,6 +49,7 @@ def write_baseline_file(
     base_path: Path,
     scanned_files: int,
 ) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "summary": build_summary(detections, scanned_files).to_dict(),
         "findings": [detection.to_baseline_record(base_path) for detection in detections],

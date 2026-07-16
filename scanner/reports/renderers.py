@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from html import escape
 import json
 from collections import Counter
 from pathlib import Path
@@ -9,6 +10,10 @@ from rich.console import Console
 from rich.table import Table
 
 from scanner.core.models import Detection, ScanSummary, Severity
+
+
+def _ensure_parent_directory(destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
 
 
 def build_summary(detections: list[Detection], scanned_files: int) -> ScanSummary:
@@ -57,6 +62,7 @@ def render_terminal(console: Console, detections: list[Detection], base_path: Pa
 
 
 def write_json_report(destination: Path, detections: list[Detection], base_path: Path, scanned_files: int) -> None:
+    _ensure_parent_directory(destination)
     payload = {
         "summary": build_summary(detections, scanned_files).to_dict(),
         "findings": [detection.to_report_dict(base_path) for detection in detections],
@@ -65,6 +71,7 @@ def write_json_report(destination: Path, detections: list[Detection], base_path:
 
 
 def write_csv_report(destination: Path, detections: list[Detection], base_path: Path) -> None:
+    _ensure_parent_directory(destination)
     with destination.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=["file", "line", "type", "severity", "preview", "rule_id"])
         writer.writeheader()
@@ -73,20 +80,21 @@ def write_csv_report(destination: Path, detections: list[Detection], base_path: 
 
 
 def write_html_report(destination: Path, detections: list[Detection], base_path: Path, scanned_files: int) -> None:
+    _ensure_parent_directory(destination)
     summary = build_summary(detections, scanned_files)
     rows = "\n".join(
         (
             "<tr>"
-            f"<td>{detection.file_path.relative_to(base_path)}</td>"
+            f"<td>{escape(str(detection.file_path.relative_to(base_path)))}</td>"
             f"<td>{detection.line_number}</td>"
-            f"<td>{detection.secret_type}</td>"
-            f"<td>{detection.severity.label()}</td>"
-            f"<td>{detection.preview}</td>"
+            f"<td>{escape(detection.secret_type)}</td>"
+            f"<td>{escape(detection.severity.label())}</td>"
+            f"<td>{escape(detection.preview)}</td>"
             "</tr>"
         )
         for detection in detections
     )
-    html = f"""<!DOCTYPE html>
+    report_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -121,10 +129,11 @@ def write_html_report(destination: Path, detections: list[Detection], base_path:
 </body>
 </html>
 """
-    destination.write_text(html, encoding="utf-8")
+    destination.write_text(report_html, encoding="utf-8")
 
 
 def write_sarif_report(destination: Path, detections: list[Detection], base_path: Path, scanned_files: int) -> None:
+    _ensure_parent_directory(destination)
     summary = build_summary(detections, scanned_files)
     rules = {
         detection.rule_id: {
